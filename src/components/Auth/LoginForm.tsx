@@ -52,7 +52,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, employees }) => {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyUp={handleKeyPress}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               placeholder="tu@empresa.com"
             />
@@ -84,11 +84,11 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, employees }) => {
         </button>
       </div>
 
-      {/* <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+      <div className="mt-6 p-4 bg-gray-50 rounded-lg">
         <p className="text-xs text-gray-600 mb-2">Credenciales de prueba:</p>
         <p className="text-xs text-gray-700"><strong>Empleado:</strong> juan@empresa.com / 1234</p>
         <p className="text-xs text-gray-700"><strong>Admin:</strong> admin@empresa.com / admin</p>
-      </div> */}
+      </div>
     </div>
   );
 };

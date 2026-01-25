@@ -1,73 +1,126 @@
-# React + TypeScript + Vite
+# Asist Employed
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Sistema de gestión de asistencia de empleados con panel de administrador y control de asistencia en tiempo real.
 
-Currently, two official plugins are available:
+## Descripción
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Asist Employed es una aplicación web desarrollada con React y TypeScript que permite:
 
-## React Compiler
+- **Empleados**: Registrar entrada/salida, ver historial de asistencia y visualizar su perfil
+- **Administradores**: Gestionar empleados, ver historial de asistencia diaria, generar reportes
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Características
 
-## Expanding the ESLint configuration
+- ✅ Autenticación de usuarios (empleados y administradores)
+- ✅ Control de asistencia en tiempo real con reloj en vivo
+- ✅ Historial de asistencia por empleado
+- ✅ Panel de administración
+- ✅ Gestión de empleados (crear, editar, ver lista)
+- ✅ Reportes diarios de asistencia
+- ✅ Generación de reportes en PDF
+- ✅ Diseño responsivo con Tailwind CSS
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Tecnologías
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- **Frontend**: React 19, TypeScript, Vite
+- **Backend**: Supabase
+- **Estilos**: Tailwind CSS
+- **Gestión de estado**: Zustand
+- **Enrutamiento**: React Router DOM
+- **Utilidades**: date-fns, jsPDF
+- **Iconos**: Lucide React
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+## Instalación
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+### Requisitos previos
+
+- Node.js >= 18
+- pnpm
+
+### Pasos
+
+1. Clonar el repositorio
+```bash
+git clone <repository-url>
+cd asist_employed
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+2. Instalar dependencias
+```bash
+pnpm install
 ```
+
+3. Configurar variables de entorno
+
+Crear un archivo `.env.local` en la raíz del proyecto:
+```
+VITE_SUPABASE_URL=<tu-url-supabase>
+VITE_SUPABASE_ANON_KEY=<tu-anon-key>
+```
+
+4. Ejecutar en desarrollo
+```bash
+pnpm dev
+```
+
+5. Construir para producción
+```bash
+pnpm build
+```
+
+## Estructura del Proyecto
+
+```
+src/
+├── components/
+│   ├── Admin/              # Componentes del panel administrativo
+│   ├── Auth/               # Componentes de autenticación
+│   ├── Employee/           # Componentes para empleados
+│   └── Shared/             # Componentes compartidos
+├── types/                  # Definiciones de tipos TypeScript
+├── utils/                  # Funciones utilitarias
+├── supabase/
+│   └── migrations/         # Migraciones de base de datos
+├── App.tsx                 # Componente raíz
+└── main.tsx                # Entrada de la aplicación
+```
+
+
+
+## Uso
+
+### Para Empleados
+
+1. Inicia sesión con tus credenciales
+2. En el panel de empleado puedes:
+   * Registrar entrada/salida
+   * Ver tu historial de asistencia
+   * Ver tu información de perfil
+
+### Para Administradores
+
+1. Inicia sesión con credenciales de administrador
+2. En el panel administrativo puedes:
+   * Crear nuevos empleados
+   * Ver lista de todos los empleados
+   * Consultar historial de asistencia diaria
+   * Generar reportes
+
+## Scripts Disponibles
+
+* `pnpm dev` - Inicia servidor de desarrollo
+* `pnpm build` - Construye la aplicación para producción
+* `pnpm preview` - Previsualiza la compilación de producción
+* `pnpm lint` - Ejecuta ESLint para verificar el código
+
+## Licencia
+
+Este proyecto está bajo licencia MIT privada. Consulta el archivo [LICENSE](LICENSE) para más detalles.
+
+## Autor
+
+Proyecto desarrollado por sefogi
+
+## Contribuciones
+
+Las contribuciones son bienvenidas. Por favor, abre un issue o envía un pull request con tus cambios.
