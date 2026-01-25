@@ -119,7 +119,7 @@ Este proyecto está bajo licencia MIT privada. Consulta el archivo [LICENSE](LIC
 
 ## Autor
 
-Proyecto desarrollado por sefogi
+Proyecto desarrollado por sebastian forero
 
 ## Contribuciones
 
