@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LoginForm from './components/Auth/LoginForm';
 import LiveClock from './components/Shared/LiveClock';
 import Alert from './components/Shared/Alert';
@@ -6,186 +6,170 @@ import EmployeeProfile from './components/Employee/EmployeeProfile';
 import AttendanceControls from './components/Employee/AttendanceControls';
 import AttendanceHistory from './components/Employee/AttendanceHistory';
 import AdminDashboard from './components/Admin/AdminDashboard';
-import type {
-  User,
-  AttendanceRecord,
-  Notification,
-  LoginLog,
-  AlertMessage,
-  CreateUserDTO
-} from './types';
-
-// Mock database
-const mockDB = {
-  users: [
-    { id: '1', name: 'Juan Pérez', email: 'juan@empresa.com', password: '1234', role: 'employee' as const, department: 'Ventas', position: 'Ejecutivo' },
-    { id: '2', name: 'María González', email: 'maria@empresa.com', password: '1234', role: 'employee' as const, department: 'Marketing', position: 'Diseñadora' },
-    { id: '3', name: 'Carlos Ruiz', email: 'carlos@empresa.com', password: '1234', role: 'employee' as const, department: 'IT', position: 'Desarrollador' },
-    { id: '4', name: 'Admin Sistema', email: 'admin@empresa.com', password: 'admin', role: 'admin' as const, department: 'Administración', position: 'Gerente' }
-  ],
-};
+import { useAuth } from './hooks/useAuth';
+import { useEmployees } from './hooks/useEmployees';
+import { useAttendance } from './hooks/useAttendance';
+import { useNotifications } from './hooks/useNotifications';
+import { useLoginLogs } from './hooks/useLoginLogs';
+import type { AlertMessage, CreateUserDTO } from './types';
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loginLogs, setLoginLogs] = useState<LoginLog[]>([]);
-  const [employees, setEmployees] = useState<User[]>(mockDB.users);
+  const { user, login, logout } = useAuth();
+  const { employees, createEmployee } = useEmployees();
+  const { attendance, checkIn, checkOut, requestOvertime, approveOvertime, refetch: refetchAttendance } = useAttendance();
+  const { notifications, createNotification, deleteNotification } = useNotifications();
+  const { loginLogs } = useLoginLogs();
   const [alert, setAlert] = useState<AlertMessage | null>(null);
 
-  const handleLogin = (user: User) => {
-    const updatedUser = employees.find(e => e.email === user.email && e.password === user.password);
-    if (!updatedUser) return;
-    
-    setCurrentUser(updatedUser);
-    
-    if (updatedUser.role === 'employee') {
-      const loginLog: LoginLog = {
-        id: Date.now().toString(),
-        employee_id: updatedUser.id,
-        employee_name: updatedUser.name,
-        login_time: new Date().toISOString()
-      };
-      setLoginLogs([...loginLogs, loginLog]);
+  const handleLogin = async (loginUser: typeof user) => {
+    if (!loginUser) return;
+    const success = await login({ email: loginUser.email, password: loginUser.password || '' });
+    if (!success) {
+      setAlert({ type: 'error', message: 'Credenciales incorrectas' });
     }
   };
 
   const handleLogout = () => {
-    setCurrentUser(null);
+    logout();
     setAlert(null);
   };
 
-  const handleCreateEmployee = (formData: CreateUserDTO) => {
-    const newEmployee: User = {
-      id: (employees.length + 1).toString(),
-      name: formData.name,
-      email: formData.email,
-      password: formData.password,
-      role: 'employee',
-      department: formData.department,
-      position: formData.position
-    };
-
-    setEmployees([...employees, newEmployee]);
-    setAlert({
-      type: 'success',
-      message: `✓ Empleado ${formData.name} creado exitosamente`
-    });
+  const handleCreateEmployee = async (formData: CreateUserDTO) => {
+    try {
+      await createEmployee(formData);
+      setAlert({
+        type: 'success',
+        message: `✓ Empleado ${formData.name} creado exitosamente`
+      });
+    } catch (err) {
+      setAlert({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Error al crear empleado'
+      });
+    }
   };
 
-  const handleCheckIn = () => {
-    if (!currentUser) return;
+  const handleCheckIn = async () => {
+    if (!user) return;
 
-    const existingRecord = attendance.find(a => 
-      a.employee_id === currentUser.id && 
-      new Date(a.check_in).toDateString() === new Date().toDateString()
-    );
-
-    if (existingRecord) {
-      setAlert({ type: 'error', message: 'Ya registraste tu entrada hoy' });
-      return;
-    }
-
-    const newRecord: AttendanceRecord = {
-      id: Date.now().toString(),
-      employee_id: currentUser.id,
-      employee_name: currentUser.name,
-      check_in: new Date().toISOString(),
-      check_out: null,
-      overtime_requested: false,
-      overtime_approved: false
-    };
-
-    setAttendance([...attendance, newRecord]);
-    setAlert({ 
-      type: 'success', 
-      message: `✓ Entrada registrada exitosamente a las ${new Date().toLocaleTimeString()}` 
-    });
-  };
-
-  const handleCheckOut = () => {
-    if (!currentUser) return;
-
-    const todayRecord = attendance.find(a => 
-      a.employee_id === currentUser.id && 
-      a.check_out === null &&
-      new Date(a.check_in).toDateString() === new Date().toDateString()
-    );
-
-    if (!todayRecord) {
-      setAlert({ type: 'error', message: 'No hay registro de entrada para hoy' });
-      return;
-    }
-
-    const checkInTime = new Date(todayRecord.check_in);
-    const checkOutTime = new Date();
-    const hoursWorked = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
-
-    const updatedAttendance = attendance.map(a => 
-      a.id === todayRecord.id 
-        ? { ...a, check_out: checkOutTime.toISOString() }
-        : a
-    );
-
-    setAttendance(updatedAttendance);
-
-    if (hoursWorked >= 8) {
+    try {
+      await checkIn({
+        employee_id: user.id,
+        employee_name: user.name,
+        check_in: new Date().toISOString()
+      });
+      
       setAlert({ 
         type: 'success', 
-        message: '¡Felicidades! Terminaste tu jornada laboral. Excelente trabajo hoy.' 
+        message: `✓ Entrada registrada exitosamente a las ${new Date().toLocaleTimeString()}` 
       });
-    } else {
-      setAlert({ 
-        type: 'info', 
-        message: `Salida registrada. Trabajaste ${hoursWorked.toFixed(1)} horas.` 
+      
+      await refetchAttendance();
+    } catch (err) {
+      setAlert({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Error al registrar entrada'
       });
     }
   };
 
-  const handleRequestOvertime = () => {
-    if (!currentUser) return;
+  const handleCheckOut = async () => {
+    if (!user) return;
 
-    const todayRecord = attendance.find(a => 
-      a.employee_id === currentUser.id && 
-      new Date(a.check_in).toDateString() === new Date().toDateString()
-    );
+    try {
+      const todayRecord = attendance.find(a => 
+        a.employee_id === user.id && 
+        a.check_out === null &&
+        new Date(a.check_in).toDateString() === new Date().toDateString()
+      );
 
-    if (!todayRecord || todayRecord.overtime_requested) return;
+      if (!todayRecord) {
+        setAlert({ type: 'error', message: 'No hay registro de entrada para hoy' });
+        return;
+      }
 
-    const updatedAttendance = attendance.map(a => 
-      a.id === todayRecord.id 
-        ? { ...a, overtime_requested: true }
-        : a
-    );
-    setAttendance(updatedAttendance);
+      await checkOut(todayRecord.id);
 
-    const notification: Notification = {
-      id: Date.now().toString(),
-      employee_id: currentUser.id,
-      employee_name: currentUser.name,
-      message: `Solicita autorización para trabajar horas extras`,
-      timestamp: new Date().toISOString(),
-      type: 'overtime_request'
-    };
+      const checkInTime = new Date(todayRecord.check_in);
+      const checkOutTime = new Date();
+      const hoursWorked = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
 
-    setNotifications([...notifications, notification]);
-    setAlert({ 
-      type: 'info', 
-      message: 'Solicitud enviada al administrador' 
-    });
+      if (hoursWorked >= 8) {
+        setAlert({ 
+          type: 'success', 
+          message: '🎉 ¡Felicidades! Terminaste tu jornada laboral. Excelente trabajo hoy.' 
+        });
+      } else {
+        setAlert({ 
+          type: 'info', 
+          message: `Salida registrada. Trabajaste ${hoursWorked.toFixed(1)} horas.` 
+        });
+      }
+      
+      await refetchAttendance();
+    } catch (err) {
+      setAlert({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Error al registrar salida'
+      });
+    }
   };
 
-  const handleApproveOvertime = (notificationId: string, employeeId: string) => {
-    const updatedAttendance = attendance.map(a => 
-      a.employee_id === employeeId && 
-      new Date(a.check_in).toDateString() === new Date().toDateString()
-        ? { ...a, overtime_approved: true }
-        : a
-    );
-    
-    setAttendance(updatedAttendance);
-    setNotifications(notifications.filter(n => n.id !== notificationId));
-    setAlert({ type: 'success', message: '✓ Horas extras aprobadas correctamente' });
+  const handleRequestOvertime = async () => {
+    if (!user) return;
+
+    try {
+      const todayRecord = attendance.find(a => 
+        a.employee_id === user.id && 
+        new Date(a.check_in).toDateString() === new Date().toDateString()
+      );
+
+      if (!todayRecord || todayRecord.overtime_requested) return;
+
+      await requestOvertime(todayRecord.id);
+
+      await createNotification({
+        employee_id: user.id,
+        employee_name: user.name,
+        message: `Solicita autorización para trabajar horas extras`,
+        type: 'overtime_request'
+      });
+
+      setAlert({ 
+        type: 'info', 
+        message: '📨 Solicitud enviada al administrador' 
+      });
+      
+      await refetchAttendance();
+    } catch (err) {
+      setAlert({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Error al solicitar horas extras'
+      });
+    }
+  };
+
+  const handleApproveOvertime = async (notificationId: string, employeeId: string) => {
+    try {
+      const record = attendance.find(a => 
+        a.employee_id === employeeId && 
+        new Date(a.check_in).toDateString() === new Date().toDateString()
+      );
+
+      if (!record) return;
+
+      await approveOvertime(record.id);
+      await deleteNotification(notificationId);
+      
+      setAlert({ type: 'success', message: '✓ Horas extras aprobadas correctamente' });
+      
+      await refetchAttendance();
+    } catch (err) {
+      setAlert({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Error al aprobar horas extras'
+      });
+    }
   };
 
   return (
@@ -204,11 +188,11 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {!currentUser ? (
+        {!user ? (
           <LoginForm onLogin={handleLogin} employees={employees} />
         ) : (
           <div className="space-y-6">
-            {currentUser.role === 'employee' ? (
+            {user.role === 'employee' ? (
               <>
                 <div className="flex items-center justify-between">
                   <div></div>
@@ -220,16 +204,16 @@ const App: React.FC = () => {
                   </button>
                 </div>
                 
-                <EmployeeProfile user={currentUser} />
+                <EmployeeProfile user={user} />
                 <LiveClock />
                 <AttendanceControls 
-                  user={currentUser}
+                  user={user}
                   attendance={attendance}
                   onCheckIn={handleCheckIn}
                   onCheckOut={handleCheckOut}
                   onRequestOvertime={handleRequestOvertime}
                 />
-                <AttendanceHistory userId={currentUser.id} attendance={attendance} />
+                <AttendanceHistory userId={user.id} attendance={attendance} />
               </>
             ) : (
               <>
@@ -252,4 +236,4 @@ const App: React.FC = () => {
   );
 };
 
-export default App
+export default App;

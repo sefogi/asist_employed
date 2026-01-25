@@ -1,126 +1,187 @@
-# Asist Employed
+# Sistema de Control de Asistencia de Empleados
 
-Sistema de gestión de asistencia de empleados con panel de administrador y control de asistencia en tiempo real.
-
-## Descripción
-
-Asist Employed es una aplicación web desarrollada con React y TypeScript que permite:
-
-- **Empleados**: Registrar entrada/salida, ver historial de asistencia y visualizar su perfil
-- **Administradores**: Gestionar empleados, ver historial de asistencia diaria, generar reportes
+Sistema completo de gestión de asistencia laboral desarrollado con React, TypeScript y Supabase.
 
 ## Características
 
-- ✅ Autenticación de usuarios (empleados y administradores)
-- ✅ Control de asistencia en tiempo real con reloj en vivo
-- ✅ Historial de asistencia por empleado
-- ✅ Panel de administración
-- ✅ Gestión de empleados (crear, editar, ver lista)
-- ✅ Reportes diarios de asistencia
-- ✅ Generación de reportes en PDF
-- ✅ Diseño responsivo con Tailwind CSS
+### Para Empleados:
+
+- ✅ Login individual con credenciales personales
+- ✅ Ficha personal con información del empleado
+- ✅ Marcado de entrada y salida
+- ✅ Visualización de horas trabajadas en tiempo real
+- ✅ Solicitud de horas extras
+- ✅ Historial personal de asistencia
+
+### Para Administradores:
+
+- ✅ Panel de control administrativo
+- ✅ Creación de nuevos empleados
+- ✅ Lista completa de empleados
+- ✅ Control de login vs marcado de asistencia
+- ✅ Aprobación de horas extras
+- ✅ Historial diario de asistencia
+- ✅ Exportación de reportes a HTML/PDF
 
 ## Tecnologías
 
-- **Frontend**: React 19, TypeScript, Vite
-- **Backend**: Supabase
-- **Estilos**: Tailwind CSS
-- **Gestión de estado**: Zustand
-- **Enrutamiento**: React Router DOM
-- **Utilidades**: date-fns, jsPDF
-- **Iconos**: Lucide React
+- **Frontend:** React 18 + TypeScript
+- **Estilos:** Tailwind CSS
+- **Base de Datos:** Supabase (PostgreSQL)
+- **Iconos:** Lucide React
+- **Build Tool:** Vite
 
 ## Instalación
 
-### Requisitos previos
+### 1. Clonar el repositorio
 
-- Node.js >= 18
-- pnpm
-
-### Pasos
-
-1. Clonar el repositorio
 ```bash
 git clone <repository-url>
-cd asist_employed
+cd employee-attendance-system
 ```
 
-2. Instalar dependencias
+### 2. Instalar dependencias
+
 ```bash
-pnpm install
+npm install
 ```
 
-3. Configurar variables de entorno
+### 3. Configurar Supabase
 
-Crear un archivo `.env.local` en la raíz del proyecto:
-```
-VITE_SUPABASE_URL=<tu-url-supabase>
-VITE_SUPABASE_ANON_KEY=<tu-anon-key>
-```
+1. Crea una cuenta en [Supabase](https://supabase.com)
+2. Crea un nuevo proyecto
+3. Ve a **Project Settings** → **API**
+4. Copia la `URL` y `anon key`
 
-4. Ejecutar en desarrollo
+### 4. Configurar variables de entorno
+
 ```bash
-pnpm dev
+cp .env.example .env
 ```
 
-5. Construir para producción
-```bash
-pnpm build
+Edita `.env` y añade tus credenciales:
+
+```env
+VITE_SUPABASE_URL=tu_supabase_url
+VITE_SUPABASE_ANON_KEY=tu_supabase_anon_key
 ```
+
+### 5. Ejecutar migraciones de base de datos
+
+Ve al **SQL Editor** en Supabase y ejecuta los archivos en orden:
+
+1. `supabase/migrations/001_create_users_table.sql`
+2. `supabase/migrations/002_create_attendance_table.sql`
+3. `supabase/migrations/003_create_login_logs_table.sql`
+4. `supabase/migrations/004_create_notifications_table.sql`
+5. `supabase/migrations/005_create_policies.sql`
+6. `supabase/migrations/006_create_functions.sql`
+7. `supabase/seed/initial_data.sql` (Datos de prueba)
+
+### 6. Iniciar el proyecto
+
+```bash
+npm run dev
+```
+
+La aplicación estará disponible en `http://localhost:5173`
+
+## Usuarios de Prueba
+
+### Administrador:
+
+- **Email:** admin@empresa.com
+- **Password:** admin
+
+### Empleados:
+
+- **Email:** juan@empresa.com | **Password:** 1234
+- **Email:** maria@empresa.com | **Password:** 1234
+- **Email:** carlos@empresa.com | **Password:** 1234
 
 ## Estructura del Proyecto
 
 ```
 src/
 ├── components/
-│   ├── Admin/              # Componentes del panel administrativo
-│   ├── Auth/               # Componentes de autenticación
-│   ├── Employee/           # Componentes para empleados
-│   └── Shared/             # Componentes compartidos
-├── types/                  # Definiciones de tipos TypeScript
-├── utils/                  # Funciones utilitarias
-├── supabase/
-│   └── migrations/         # Migraciones de base de datos
-├── App.tsx                 # Componente raíz
-└── main.tsx                # Entrada de la aplicación
+│   ├── Auth/          # Componentes de autenticación
+│   ├── Employee/      # Componentes de empleados
+│   ├── Admin/         # Componentes de administrador
+│   └── Shared/        # Componentes compartidos
+├── hooks/             # Custom hooks
+├── services/          # Servicios de API
+│   └── supabase/      # Servicios de Supabase
+├── context/           # Context API
+├── types/             # TypeScript types
+├── utils/             # Funciones utilitarias
+└── styles/            # Estilos globales
 ```
 
+## Seguridad
 
+- Row Level Security (RLS) habilitado en Supabase
+- Políticas de acceso por rol
+- Validación de datos en frontend y backend
+- Contraseñas hasheadas (recomendado usar bcrypt en producción)
 
-## Uso
+## Características Avanzadas
 
-### Para Empleados
+### Control de Login
 
-1. Inicia sesión con tus credenciales
-2. En el panel de empleado puedes:
-   * Registrar entrada/salida
-   * Ver tu historial de asistencia
-   * Ver tu información de perfil
+- Registra cuando el empleado inicia sesión en la app
+- Compara hora de login vs hora de marcado
+- Detecta empleados logueados sin marcado
 
-### Para Administradores
+### Reportes Exportables
 
-1. Inicia sesión con credenciales de administrador
-2. En el panel administrativo puedes:
-   * Crear nuevos empleados
-   * Ver lista de todos los empleados
-   * Consultar historial de asistencia diaria
-   * Generar reportes
+- Exportación a HTML (convertible a PDF)
+- Estadísticas diarias
+- Información completa de asistencia
+
+### Tiempo Real
+
+- Reloj en vivo
+- Contador de horas trabajadas
+- Barra de progreso de jornada
 
 ## Scripts Disponibles
 
-* `pnpm dev` - Inicia servidor de desarrollo
-* `pnpm build` - Construye la aplicación para producción
-* `pnpm preview` - Previsualiza la compilación de producción
-* `pnpm lint` - Ejecuta ESLint para verificar el código
+```bash
+npm run dev      # Modo desarrollo
+npm run build    # Build para producción
+npm run preview  # Preview del build
+npm run lint     # Ejecutar linter
+```
 
-## Licencia
+## To-Do / Mejoras Futuras
 
-Este proyecto está bajo licencia MIT privada. Consulta el archivo [LICENSE](LICENSE) para más detalles.
-
-## Autor
-
-Proyecto desarrollado por sebastian forero
+- [ ] Autenticación con Supabase Auth
+- [ ] Notificaciones push
+- [ ] Dashboard con gráficas
+- [ ] Exportación a Excel/CSV
+- [ ] App móvil con React Native
+- [ ] Geolocalización para marcado
+- [ ] Reconocimiento facial
+- [ ] Integración con nómina
 
 ## Contribuciones
 
-Las contribuciones son bienvenidas. Por favor, abre un issue o envía un pull request con tus cambios.
+Las contribuciones son bienvenidas. Por favor:
+
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
+
+## 📄 Licencia
+
+MIT License - ver el archivo LICENSE para más detalles
+
+## 📧 Contacto
+
+Para preguntas o sugerencias, abre un issue en el repositorio.
+
+---
+
+Desarrollado con ❤️ usando React + TypeScript + Supabase
