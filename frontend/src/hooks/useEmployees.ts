@@ -22,11 +22,10 @@ export const useEmployees = (enabled: boolean) => {
   }, []);
 
   useEffect(() => {
-    if (enabled) {
-      fetchEmployees();
-    } else {
-      setEmployees([]);
-    }
+    if (!enabled) return;
+    // Carga inicial de datos: el setLoading síncrono dentro del fetch es intencional
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchEmployees();
   }, [enabled, fetchEmployees]);
 
   const createEmployee = async (employeeData: CreateUserDTO): Promise<void> => {
@@ -45,7 +44,8 @@ export const useEmployees = (enabled: boolean) => {
   };
 
   return {
-    employees,
+    // Derivado: deshabilitado (p. ej. tras logout) no expone datos antiguos
+    employees: enabled ? employees : [],
     loading,
     error,
     createEmployee,

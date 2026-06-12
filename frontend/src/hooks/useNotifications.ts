@@ -22,11 +22,10 @@ export const useNotifications = (enabled: boolean) => {
   }, []);
 
   useEffect(() => {
-    if (enabled) {
-      fetchNotifications();
-    } else {
-      setNotifications([]);
-    }
+    if (!enabled) return;
+    // Carga inicial de datos: el setLoading síncrono dentro del fetch es intencional
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchNotifications();
   }, [enabled, fetchNotifications]);
 
   const deleteNotification = async (id: string): Promise<void> => {
@@ -35,7 +34,7 @@ export const useNotifications = (enabled: boolean) => {
   };
 
   return {
-    notifications,
+    notifications: enabled ? notifications : [],
     loading,
     error,
     deleteNotification,
