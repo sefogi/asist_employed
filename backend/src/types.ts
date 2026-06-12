@@ -1,0 +1,45 @@
+import type { Pool } from 'pg';
+import type { AppConfig } from './config.js';
+
+export type Role = 'employee' | 'admin';
+
+/** Usuario sin credenciales: lo único que sale del backend. */
+export interface SafeUser {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  department: string;
+  position: string;
+  created_at: Date;
+}
+
+export interface AttendanceRecord {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  check_in: Date;
+  check_out: Date | null;
+  overtime_requested: boolean;
+  overtime_approved: boolean;
+  created_at: Date;
+}
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    pg: Pool;
+    config: AppConfig;
+    authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    requireAdmin: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  }
+  interface FastifyRequest {
+    currentUser: SafeUser;
+  }
+}
+
+declare module '@fastify/jwt' {
+  interface FastifyJWT {
+    payload: { sub: string; role: Role };
+    user: { sub: string; role: Role };
+  }
+}
