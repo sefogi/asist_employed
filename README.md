@@ -1,187 +1,114 @@
 # Sistema de Control de Asistencia de Empleados
 
-Sistema completo de gestión de asistencia laboral desarrollado con React, TypeScript y Supabase.
+Sistema de gestión de asistencia laboral: los empleados fichan entrada/salida y solicitan horas extra; el administrador gestiona empleados, aprueba horas extra y exporta reportes.
 
-## Características
+## Arquitectura
 
-### Para Empleados:
+```
+┌──────────────┐      HTTP/JSON       ┌──────────────┐        SQL        ┌──────────────┐
+│   Frontend   │ ──────────────────▶  │   API REST   │ ────────────────▶ │  PostgreSQL  │
+│ React + Vite │   JWT en cada call   │  Fastify 5   │   pg (pool)       │      16      │
+└──────────────┘                      └──────────────┘                   └──────────────┘
+```
 
-- ✅ Login individual con credenciales personales
-- ✅ Ficha personal con información del empleado
-- ✅ Marcado de entrada y salida
-- ✅ Visualización de horas trabajadas en tiempo real
-- ✅ Solicitud de horas extras
-- ✅ Historial personal de asistencia
+- **Frontend:** React 19 + TypeScript + Tailwind CSS (`src/`)
+- **Backend:** Node 22 + Fastify 5 + TypeScript (`backend/`)
+- **Base de datos:** PostgreSQL 16 (migraciones SQL puras en `backend/migrations/`)
+- **Contrato de API:** OpenAPI 3.1 design-first en [`docs/openapi.yaml`](docs/openapi.yaml), servido con Swagger UI en `/api/docs`
+- **Seguridad:** contraseñas con bcrypt, sesiones JWT con expiración, autorización por rol en el backend
+- **Tests:** vitest contra PostgreSQL real (TDD), incluye test de conformidad con el contrato OpenAPI
 
-### Para Administradores:
+## Desarrollo local
 
-- ✅ Panel de control administrativo
-- ✅ Creación de nuevos empleados
-- ✅ Lista completa de empleados
-- ✅ Control de login vs marcado de asistencia
-- ✅ Aprobación de horas extras
-- ✅ Historial diario de asistencia
-- ✅ Exportación de reportes a HTML/PDF
+Requisitos: Node 22+, pnpm, Docker.
 
-## Tecnologías
-
-- **Frontend:** React 18 + TypeScript
-- **Estilos:** Tailwind CSS
-- **Base de Datos:** Supabase (PostgreSQL)
-- **Iconos:** Lucide React
-- **Build Tool:** Vite
-
-## Instalación
-
-### 1. Clonar el repositorio
+### 1. Base de datos (Docker)
 
 ```bash
-git clone <repository-url>
-cd employee-attendance-system
+docker compose -f docker-compose.dev.yml up -d
 ```
 
-### 2. Instalar dependencias
+Levanta PostgreSQL 16 en el puerto **5433** con las bases `asist` (dev) y `asist_test` (tests).
+
+### 2. Backend
 
 ```bash
-npm install
+cd backend
+cp .env.example .env        # revisa JWT_SECRET y APP_TIMEZONE
+pnpm install
+pnpm seed                   # aplica migraciones + datos de prueba
+pnpm dev                    # API en http://localhost:3000
 ```
 
-### 3. Configurar Supabase
+- Documentación interactiva: http://localhost:3000/api/docs
+- Tests (necesitan la BD de Docker arriba): `pnpm test`
+- Migraciones manuales: `pnpm migrate`
 
-1. Crea una cuenta en [Supabase](https://supabase.com)
-2. Crea un nuevo proyecto
-3. Ve a **Project Settings** → **API**
-4. Copia la `URL` y `anon key`
-
-### 4. Configurar variables de entorno
+### 3. Frontend
 
 ```bash
-cp .env.example .env
+# en la raíz del repo
+cp .env.example .env        # VITE_API_URL=http://localhost:3000/api/v1
+pnpm install
+pnpm dev                    # http://localhost:5173
 ```
 
-Edita `.env` y añade tus credenciales:
+## Usuarios de prueba (seed)
 
-```env
-VITE_SUPABASE_URL=tu_supabase_url
-VITE_SUPABASE_ANON_KEY=tu_supabase_anon_key
-```
+| Rol | Email | Contraseña |
+| --- | --- | --- |
+| Admin | admin@empresa.com | cambiar-admin-123 |
+| Empleado | juan@empresa.com | empleado-1234 |
+| Empleado | maria@empresa.com | empleado-1234 |
+| Empleado | carlos@empresa.com | empleado-1234 |
 
-### 5. Ejecutar migraciones de base de datos
+> En producción define `SEED_ADMIN_EMAIL` y `SEED_ADMIN_PASSWORD` antes de ejecutar el seed, o cambia la contraseña tras el primer login.
 
-Ve al **SQL Editor** en Supabase y ejecuta los archivos en orden:
+## API
 
-1. `supabase/migrations/001_create_users_table.sql`
-2. `supabase/migrations/002_create_attendance_table.sql`
-3. `supabase/migrations/003_create_login_logs_table.sql`
-4. `supabase/migrations/004_create_notifications_table.sql`
-5. `supabase/migrations/005_create_policies.sql`
-6. `supabase/migrations/006_create_functions.sql`
-7. `supabase/seed/initial_data.sql` (Datos de prueba)
+Contrato completo en [`docs/openapi.yaml`](docs/openapi.yaml). Resumen:
 
-### 6. Iniciar el proyecto
+| Método | Ruta | Quién | Descripción |
+| --- | --- | --- | --- |
+| POST | `/api/v1/auth/login` | público | Login → JWT |
+| GET | `/api/v1/auth/me` | autenticado | Usuario actual |
+| GET/POST | `/api/v1/employees` | admin | Listar / crear empleados |
+| GET/PATCH/DELETE | `/api/v1/employees/:id` | admin (GET también el propio) | Detalle / editar / eliminar |
+| GET | `/api/v1/attendance` | autenticado | Empleado: los suyos; admin: todos |
+| POST | `/api/v1/attendance/check-in` | empleado | Fichar entrada (hora del servidor) |
+| POST | `/api/v1/attendance/check-out` | empleado | Fichar salida |
+| POST | `/api/v1/attendance/:id/overtime/request` | empleado dueño | Solicitar horas extra (notifica al admin) |
+| POST | `/api/v1/attendance/:id/overtime/approve` | admin | Aprobar horas extra |
+| GET | `/api/v1/notifications` | admin | Notificaciones |
+| DELETE | `/api/v1/notifications/:id` | admin | Eliminar notificación |
+| GET | `/api/v1/login-logs` | admin | Registro de logins |
+| GET | `/api/v1/health` | público | Healthcheck |
 
-```bash
-npm run dev
-```
+## Reglas de negocio del fichaje
 
-La aplicación estará disponible en `http://localhost:5173`
+- La hora de entrada/salida la fija **el servidor**, nunca el cliente.
+- Un empleado no puede fichar entrada dos veces el mismo día (índice único en BD para registros abiertos).
+- "Hoy" se evalúa en la zona horaria de `APP_TIMEZONE` (formato IANA, p. ej. `Europe/Madrid`).
+- Al solicitar horas extra se crea automáticamente una notificación para el admin, ligada al registro de asistencia; al aprobarlas, la notificación se elimina.
 
-## Usuarios de Prueba
+## Scripts
 
-### Administrador:
+| Dónde | Comando | Qué hace |
+| --- | --- | --- |
+| raíz | `pnpm dev` / `pnpm build` / `pnpm lint` | Frontend |
+| backend | `pnpm dev` | API con recarga (tsx watch) |
+| backend | `pnpm test` | Suite TDD contra Postgres real |
+| backend | `pnpm migrate` / `pnpm seed` | Migraciones / datos iniciales |
+| backend | `pnpm build` / `pnpm start` | Compilar y ejecutar producción |
 
-- **Email:** admin@empresa.com
-- **Password:** admin
+## Roadmap
 
-### Empleados:
+- [x] **Fase 1** — Backend propio (Fastify + PostgreSQL), bcrypt + JWT, contrato OpenAPI, TDD
+- [ ] **Fase 2** — Dockerización completa (frontend + API + BD + nginx) para un solo servidor
+- [ ] **Fase 3** — Rediseño UX/UI (mobile-first para fichaje, routing, sistema de diseño)
+- [ ] **Fase 4** — CI/CD con GitHub Actions (lint + tests + build + deploy)
+- [ ] **Fase 5** — Hardening: HTTPS, backups automáticos, rate-limiting
 
-- **Email:** juan@empresa.com | **Password:** 1234
-- **Email:** maria@empresa.com | **Password:** 1234
-- **Email:** carlos@empresa.com | **Password:** 1234
+## Licencia
 
-## Estructura del Proyecto
-
-```
-src/
-├── components/
-│   ├── Auth/          # Componentes de autenticación
-│   ├── Employee/      # Componentes de empleados
-│   ├── Admin/         # Componentes de administrador
-│   └── Shared/        # Componentes compartidos
-├── hooks/             # Custom hooks
-├── services/          # Servicios de API
-│   └── supabase/      # Servicios de Supabase
-├── context/           # Context API
-├── types/             # TypeScript types
-├── utils/             # Funciones utilitarias
-└── styles/            # Estilos globales
-```
-
-## Seguridad
-
-- Row Level Security (RLS) habilitado en Supabase
-- Políticas de acceso por rol
-- Validación de datos en frontend y backend
-- Contraseñas hasheadas (recomendado usar bcrypt en producción)
-
-## Características Avanzadas
-
-### Control de Login
-
-- Registra cuando el empleado inicia sesión en la app
-- Compara hora de login vs hora de marcado
-- Detecta empleados logueados sin marcado
-
-### Reportes Exportables
-
-- Exportación a HTML (convertible a PDF)
-- Estadísticas diarias
-- Información completa de asistencia
-
-### Tiempo Real
-
-- Reloj en vivo
-- Contador de horas trabajadas
-- Barra de progreso de jornada
-
-## Scripts Disponibles
-
-```bash
-npm run dev      # Modo desarrollo
-npm run build    # Build para producción
-npm run preview  # Preview del build
-npm run lint     # Ejecutar linter
-```
-
-## To-Do / Mejoras Futuras
-
-- [ ] Autenticación con Supabase Auth
-- [ ] Notificaciones push
-- [ ] Dashboard con gráficas
-- [ ] Exportación a Excel/CSV
-- [ ] App móvil con React Native
-- [ ] Geolocalización para marcado
-- [ ] Reconocimiento facial
-- [ ] Integración con nómina
-
-## Contribuciones
-
-Las contribuciones son bienvenidas. Por favor:
-
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
-
-## 📄 Licencia
-
-MIT License - ver el archivo LICENSE para más detalles
-
-## 📧 Contacto
-
-Para preguntas o sugerencias, abre un issue en el repositorio.
-
----
-
-Desarrollado con ❤️ usando React + TypeScript + Supabase
+MIT — ver [LICENSE.MD](LICENSE.MD).

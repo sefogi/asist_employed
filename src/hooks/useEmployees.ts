@@ -1,17 +1,14 @@
-import { useState, useEffect } from 'react';
-import { employeesService } from '@/services/supabase/employees';
-import type { User, CreateUserDTO } from '@/types';
+import { useState, useEffect, useCallback } from 'react';
+import { employeesService } from '@/services/api/employees';
+import type { User, CreateUserDTO, UpdateUserDTO } from '@/types';
 
-export const useEmployees = () => {
+// enabled: solo el admin puede listar empleados; evita llamadas 403 innecesarias
+export const useEmployees = (enabled: boolean) => {
   const [employees, setEmployees] = useState<User[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchEmployees();
-  }, []);
-
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async () => {
     try {
       setLoading(true);
       const data = await employeesService.getAll();
@@ -22,33 +19,29 @@ export const useEmployees = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (enabled) {
+      fetchEmployees();
+    } else {
+      setEmployees([]);
+    }
+  }, [enabled, fetchEmployees]);
 
   const createEmployee = async (employeeData: CreateUserDTO): Promise<void> => {
-    try {
-      const newEmployee = await employeesService.create(employeeData);
-      setEmployees(prev => [...prev, newEmployee]);
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Error al crear empleado');
-    }
+    const newEmployee = await employeesService.create(employeeData);
+    setEmployees((prev) => [...prev, newEmployee]);
   };
 
-  const updateEmployee = async (id: string, updates: Partial<User>): Promise<void> => {
-    try {
-      const updated = await employeesService.update(id, updates);
-      setEmployees(prev => prev.map(e => e.id === id ? updated : e));
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Error al actualizar empleado');
-    }
+  const updateEmployee = async (id: string, updates: UpdateUserDTO): Promise<void> => {
+    const updated = await employeesService.update(id, updates);
+    setEmployees((prev) => prev.map((e) => (e.id === id ? updated : e)));
   };
 
   const deleteEmployee = async (id: string): Promise<void> => {
-    try {
-      await employeesService.delete(id);
-      setEmployees(prev => prev.filter(e => e.id !== id));
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Error al eliminar empleado');
-    }
+    await employeesService.delete(id);
+    setEmployees((prev) => prev.filter((e) => e.id !== id));
   };
 
   return {
@@ -58,6 +51,6 @@ export const useEmployees = () => {
     createEmployee,
     updateEmployee,
     deleteEmployee,
-    refetch: fetchEmployees
+    refetch: fetchEmployees,
   };
 };

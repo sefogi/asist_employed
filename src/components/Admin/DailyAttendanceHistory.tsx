@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Download, ChevronDown, ChevronUp, User } from 'lucide-react';
+import { FileText, Download, ChevronDown, ChevronUp } from 'lucide-react';
 import { calculateHoursWorked, getTimeDifference } from '@/utils/timeCalculations';
 import type { DailyAttendanceHistoryProps, AttendanceRecord } from '@/types';
 

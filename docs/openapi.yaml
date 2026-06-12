@@ -1,0 +1,646 @@
+openapi: 3.1.0
+info:
+  title: Asist Employed API
+  description: |
+    API REST del sistema de control de asistencia de empleados.
+
+    - Autenticación con JWT (header `Authorization: Bearer <token>`).
+    - Todos los endpoints requieren token salvo `POST /auth/login` y `GET /health`.
+    - Los timestamps los fija el servidor; el cliente nunca envía horas de fichaje.
+    - Las contraseñas se almacenan con bcrypt y nunca se devuelven en ninguna respuesta.
+  version: 1.0.0
+  license:
+    name: MIT
+servers:
+  - url: /api/v1
+
+tags:
+  - name: auth
+    description: Autenticación y sesión
+  - name: employees
+    description: Gestión de empleados (solo admin)
+  - name: attendance
+    description: Fichaje de entrada/salida y horas extra
+  - name: notifications
+    description: Notificaciones para el administrador
+  - name: login-logs
+    description: Registro de inicios de sesión de empleados
+  - name: system
+    description: Estado del servicio
+
+paths:
+  /health:
+    get:
+      tags: [system]
+      summary: Healthcheck del servicio
+      security: []
+      operationId: getHealth
+      responses:
+        '200':
+          description: Servicio operativo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Iniciar sesión
+      description: |
+        Valida credenciales contra el hash bcrypt almacenado y devuelve un JWT.
+        Si el usuario es empleado, registra automáticamente un login-log.
+      security: []
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Credenciales válidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Credenciales incorrectas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/me:
+    get:
+      tags: [auth]
+      summary: Usuario autenticado actual
+      operationId: getMe
+      responses:
+        '200':
+          description: Usuario del token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /employees:
+    get:
+      tags: [employees]
+      summary: Listar empleados
+      description: Solo admin. Devuelve usuarios con rol `employee`, sin contraseñas.
+      operationId: listEmployees
+      responses:
+        '200':
+          description: Lista de empleados
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [employees]
+      summary: Crear empleado
+      description: Solo admin. La contraseña se hashea con bcrypt antes de guardarse.
+      operationId: createEmployee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEmployeeRequest'
+      responses:
+        '201':
+          description: Empleado creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Ya existe un usuario con ese email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /employees/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      tags: [employees]
+      summary: Obtener un empleado
+      description: Admin puede ver a cualquiera; un empleado solo a sí mismo.
+      operationId: getEmployee
+      responses:
+        '200':
+          description: Empleado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [employees]
+      summary: Actualizar empleado
+      description: Solo admin. Si se envía `password`, se re-hashea.
+      operationId: updateEmployee
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEmployeeRequest'
+      responses:
+        '200':
+          description: Empleado actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Ya existe un usuario con ese email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [employees]
+      summary: Eliminar empleado
+      description: Solo admin.
+      operationId: deleteEmployee
+      responses:
+        '204':
+          description: Empleado eliminado
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /attendance:
+    get:
+      tags: [attendance]
+      summary: Listar registros de asistencia
+      description: |
+        Admin ve todos los registros (filtrables por fecha y empleado).
+        Un empleado solo ve los suyos; el parámetro `employee_id` se ignora para él.
+      operationId: listAttendance
+      parameters:
+        - name: date
+          in: query
+          required: false
+          description: Filtra por fecha de entrada (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: employee_id
+          in: query
+          required: false
+          description: Filtra por empleado (solo admin)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Registros de asistencia
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AttendanceRecord'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /attendance/check-in:
+    post:
+      tags: [attendance]
+      summary: Marcar entrada
+      description: |
+        Solo empleados. Crea el registro del día con `check_in` fijado por el servidor.
+        Falla con 409 si ya existe un registro de entrada para hoy.
+      operationId: checkIn
+      responses:
+        '201':
+          description: Entrada registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: Ya existe un registro de entrada para hoy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /attendance/check-out:
+    post:
+      tags: [attendance]
+      summary: Marcar salida
+      description: |
+        Solo empleados. Cierra el registro abierto de hoy con `check_out` fijado por el servidor.
+        Falla con 409 si no hay registro abierto hoy.
+      operationId: checkOut
+      responses:
+        '200':
+          description: Salida registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          description: No hay registro de entrada abierto hoy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /attendance/{id}/overtime/request:
+    post:
+      tags: [attendance]
+      summary: Solicitar horas extra
+      description: |
+        Solo el empleado dueño del registro. Marca `overtime_requested` y crea
+        automáticamente una notificación `overtime_request` para el admin.
+      operationId: requestOvertime
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Solicitud registrada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Las horas extra ya fueron solicitadas para este registro
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /attendance/{id}/overtime/approve:
+    post:
+      tags: [attendance]
+      summary: Aprobar horas extra
+      description: |
+        Solo admin. Marca `overtime_approved` y elimina las notificaciones
+        de solicitud asociadas al registro.
+      operationId: approveOvertime
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '200':
+          description: Horas extra aprobadas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: El registro no tiene horas extra solicitadas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /notifications:
+    get:
+      tags: [notifications]
+      summary: Listar notificaciones
+      description: Solo admin.
+      operationId: listNotifications
+      responses:
+        '200':
+          description: Notificaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /notifications/{id}:
+    delete:
+      tags: [notifications]
+      summary: Eliminar notificación
+      description: Solo admin.
+      operationId: deleteNotification
+      parameters:
+        - $ref: '#/components/parameters/IdParam'
+      responses:
+        '204':
+          description: Notificación eliminada
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /login-logs:
+    get:
+      tags: [login-logs]
+      summary: Listar inicios de sesión
+      description: Solo admin. Filtrable por fecha.
+      operationId: listLoginLogs
+      parameters:
+        - name: date
+          in: query
+          required: false
+          description: Filtra por fecha de login (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Logs de inicio de sesión
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LoginLog'
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Unauthorized:
+      description: Token ausente, inválido o expirado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: El rol del usuario no permite esta operación
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ValidationError:
+      description: Cuerpo o parámetros inválidos
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Código estable para manejo programático
+              examples: [INVALID_CREDENTIALS, VALIDATION_ERROR, FORBIDDEN, NOT_FOUND, CONFLICT]
+            message:
+              type: string
+              description: Descripción legible del error
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+
+    LoginResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+          description: JWT firmado, con expiración
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      required: [id, email, name, role, department, position, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [employee, admin]
+        department:
+          type: string
+        position:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    CreateEmployeeRequest:
+      type: object
+      required: [name, email, password, department, position]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+          description: Mínimo 8 caracteres
+        department:
+          type: string
+          minLength: 1
+        position:
+          type: string
+          minLength: 1
+
+    UpdateEmployeeRequest:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        department:
+          type: string
+          minLength: 1
+        position:
+          type: string
+          minLength: 1
+
+    AttendanceRecord:
+      type: object
+      required: [id, employee_id, employee_name, check_in, check_out, overtime_requested, overtime_approved, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        employee_id:
+          type: string
+          format: uuid
+        employee_name:
+          type: string
+        check_in:
+          type: string
+          format: date-time
+        check_out:
+          type: ['string', 'null']
+          format: date-time
+        overtime_requested:
+          type: boolean
+        overtime_approved:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    Notification:
+      type: object
+      required: [id, employee_id, employee_name, attendance_id, message, type, read, timestamp]
+      properties:
+        id:
+          type: string
+          format: uuid
+        employee_id:
+          type: string
+          format: uuid
+        employee_name:
+          type: string
+        attendance_id:
+          type: ['string', 'null']
+          format: uuid
+          description: Registro de asistencia asociado (en solicitudes de horas extra)
+        message:
+          type: string
+        type:
+          type: string
+          enum: [overtime_request, approval, info]
+        read:
+          type: boolean
+        timestamp:
+          type: string
+          format: date-time
+
+    LoginLog:
+      type: object
+      required: [id, employee_id, employee_name, login_time]
+      properties:
+        id:
+          type: string
+          format: uuid
+        employee_id:
+          type: string
+          format: uuid
+        employee_name:
+          type: string
+        login_time:
+          type: string
+          format: date-time
+
+security:
+  - bearerAuth: []

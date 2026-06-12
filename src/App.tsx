@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import LoginForm from './components/Auth/LoginForm';
 import LiveClock from './components/Shared/LiveClock';
 import Alert from './components/Shared/Alert';
@@ -11,22 +12,34 @@ import { useEmployees } from './hooks/useEmployees';
 import { useAttendance } from './hooks/useAttendance';
 import { useNotifications } from './hooks/useNotifications';
 import { useLoginLogs } from './hooks/useLoginLogs';
-import type { AlertMessage, CreateUserDTO } from './types';
+import type {
+  AlertMessage,
+  CreateUserDTO,
+  LoginCredentials,
+  Notification,
+} from './types';
 
 const App: React.FC = () => {
-  const { user, login, logout } = useAuth();
-  const { employees, createEmployee } = useEmployees();
-  const { attendance, checkIn, checkOut, requestOvertime, approveOvertime, refetch: refetchAttendance } = useAttendance();
-  const { notifications, createNotification, deleteNotification } = useNotifications();
-  const { loginLogs } = useLoginLogs();
+  const { user, loading: authLoading, login, logout, isAuthenticated, isAdmin } = useAuth();
+  const { employees, createEmployee } = useEmployees(isAdmin);
+  const {
+    attendance,
+    checkIn,
+    checkOut,
+    requestOvertime,
+    approveOvertime,
+    refetch: refetchAttendance,
+  } = useAttendance(isAuthenticated);
+  const { notifications, refetch: refetchNotifications } = useNotifications(isAdmin);
+  const { loginLogs } = useLoginLogs(isAdmin);
   const [alert, setAlert] = useState<AlertMessage | null>(null);
 
-  const handleLogin = async (loginUser: typeof user) => {
-    if (!loginUser) return;
-    const success = await login({ email: loginUser.email, password: loginUser.password || '' });
-    if (!success) {
-      setAlert({ type: 'error', message: 'Credenciales incorrectas' });
+  const handleLogin = async (credentials: LoginCredentials): Promise<boolean> => {
+    const success = await login(credentials);
+    if (success) {
+      setAlert(null);
     }
+    return success;
   };
 
   const handleLogout = () => {
@@ -39,78 +52,53 @@ const App: React.FC = () => {
       await createEmployee(formData);
       setAlert({
         type: 'success',
-        message: `✓ Empleado ${formData.name} creado exitosamente`
+        message: `Empleado ${formData.name} creado exitosamente`,
       });
     } catch (err) {
       setAlert({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Error al crear empleado'
+        message: err instanceof Error ? err.message : 'Error al crear empleado',
       });
     }
   };
 
   const handleCheckIn = async () => {
-    if (!user) return;
-
     try {
-      await checkIn({
-        employee_id: user.id,
-        employee_name: user.name,
-        check_in: new Date().toISOString()
+      const record = await checkIn();
+      setAlert({
+        type: 'success',
+        message: `Entrada registrada a las ${new Date(record.check_in).toLocaleTimeString()}`,
       });
-      
-      setAlert({ 
-        type: 'success', 
-        message: `✓ Entrada registrada exitosamente a las ${new Date().toLocaleTimeString()}` 
-      });
-      
-      await refetchAttendance();
     } catch (err) {
       setAlert({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Error al registrar entrada'
+        message: err instanceof Error ? err.message : 'Error al registrar entrada',
       });
     }
   };
 
   const handleCheckOut = async () => {
-    if (!user) return;
-
     try {
-      const todayRecord = attendance.find(a => 
-        a.employee_id === user.id && 
-        a.check_out === null &&
-        new Date(a.check_in).toDateString() === new Date().toDateString()
-      );
-
-      if (!todayRecord) {
-        setAlert({ type: 'error', message: 'No hay registro de entrada para hoy' });
-        return;
-      }
-
-      await checkOut(todayRecord.id);
-
-      const checkInTime = new Date(todayRecord.check_in);
-      const checkOutTime = new Date();
-      const hoursWorked = (checkOutTime.getTime() - checkInTime.getTime()) / (1000 * 60 * 60);
+      const record = await checkOut();
+      const hoursWorked =
+        (new Date(record.check_out!).getTime() - new Date(record.check_in).getTime()) /
+        (1000 * 60 * 60);
 
       if (hoursWorked >= 8) {
-        setAlert({ 
-          type: 'success', 
-          message: '🎉 ¡Felicidades! Terminaste tu jornada laboral. Excelente trabajo hoy.' 
+        setAlert({
+          type: 'success',
+          message: '¡Felicidades! Terminaste tu jornada laboral. Excelente trabajo hoy.',
         });
       } else {
-        setAlert({ 
-          type: 'info', 
-          message: `Salida registrada. Trabajaste ${hoursWorked.toFixed(1)} horas.` 
+        setAlert({
+          type: 'info',
+          message: `Salida registrada. Trabajaste ${hoursWorked.toFixed(1)} horas.`,
         });
       }
-      
-      await refetchAttendance();
     } catch (err) {
       setAlert({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Error al registrar salida'
+        message: err instanceof Error ? err.message : 'Error al registrar salida',
       });
     }
   };
@@ -118,59 +106,58 @@ const App: React.FC = () => {
   const handleRequestOvertime = async () => {
     if (!user) return;
 
-    try {
-      const todayRecord = attendance.find(a => 
-        a.employee_id === user.id && 
+    const todayRecord = attendance.find(
+      (a) =>
+        a.employee_id === user.id &&
         new Date(a.check_in).toDateString() === new Date().toDateString()
-      );
+    );
 
-      if (!todayRecord || todayRecord.overtime_requested) return;
+    if (!todayRecord) {
+      setAlert({ type: 'error', message: 'Primero debes fichar la entrada' });
+      return;
+    }
+    if (todayRecord.overtime_requested) {
+      setAlert({ type: 'info', message: 'Ya solicitaste horas extra hoy' });
+      return;
+    }
 
+    try {
       await requestOvertime(todayRecord.id);
-
-      await createNotification({
-        employee_id: user.id,
-        employee_name: user.name,
-        message: `Solicita autorización para trabajar horas extras`,
-        type: 'overtime_request'
-      });
-
-      setAlert({ 
-        type: 'info', 
-        message: '📨 Solicitud enviada al administrador' 
-      });
-      
-      await refetchAttendance();
+      setAlert({ type: 'info', message: 'Solicitud enviada al administrador' });
     } catch (err) {
       setAlert({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Error al solicitar horas extras'
+        message: err instanceof Error ? err.message : 'Error al solicitar horas extras',
       });
     }
   };
 
-  const handleApproveOvertime = async (notificationId: string, employeeId: string) => {
+  const handleApproveOvertime = async (notification: Notification) => {
+    if (!notification.attendance_id) {
+      setAlert({ type: 'error', message: 'La notificación no tiene fichaje asociado' });
+      return;
+    }
+
     try {
-      const record = attendance.find(a => 
-        a.employee_id === employeeId && 
-        new Date(a.check_in).toDateString() === new Date().toDateString()
-      );
-
-      if (!record) return;
-
-      await approveOvertime(record.id);
-      await deleteNotification(notificationId);
-      
-      setAlert({ type: 'success', message: '✓ Horas extras aprobadas correctamente' });
-      
-      await refetchAttendance();
+      // El backend marca la aprobación y elimina la notificación de solicitud
+      await approveOvertime(notification.attendance_id);
+      await Promise.all([refetchNotifications(), refetchAttendance()]);
+      setAlert({ type: 'success', message: 'Horas extras aprobadas correctamente' });
     } catch (err) {
       setAlert({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Error al aprobar horas extras'
+        message: err instanceof Error ? err.message : 'Error al aprobar horas extras',
       });
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
@@ -189,7 +176,7 @@ const App: React.FC = () => {
         )}
 
         {!user ? (
-          <LoginForm onLogin={handleLogin} employees={employees} />
+          <LoginForm onLogin={handleLogin} />
         ) : (
           <div className="space-y-6">
             {user.role === 'employee' ? (
@@ -203,10 +190,10 @@ const App: React.FC = () => {
                     Cerrar Sesión
                   </button>
                 </div>
-                
+
                 <EmployeeProfile user={user} />
                 <LiveClock />
-                <AttendanceControls 
+                <AttendanceControls
                   user={user}
                   attendance={attendance}
                   onCheckIn={handleCheckIn}
@@ -218,7 +205,7 @@ const App: React.FC = () => {
             ) : (
               <>
                 <LiveClock />
-                <AdminDashboard 
+                <AdminDashboard
                   attendance={attendance}
                   notifications={notifications}
                   loginLogs={loginLogs}
