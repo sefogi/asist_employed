@@ -90,9 +90,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </p>
                   </div>
                   <button
-                    onClick={() =>
-                      onApproveOvertime(notif.id, notif.employee_id)
-                    }
+                    onClick={() => onApproveOvertime(notif)}
                     className="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition transform hover:scale-105"
                   >
                     ✓ Aprobar

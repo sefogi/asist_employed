@@ -1,22 +1,17 @@
-import { useState, useEffect } from 'react';
-import { loginLogsService } from '@/services/supabase/loginLogs';
-import type { LoginLog, CreateLoginLogDTO } from '@/types';
+import { useState, useEffect, useCallback } from 'react';
+import { loginLogsService } from '@/services/api/loginLogs';
+import type { LoginLog } from '@/types';
 
-export const useLoginLogs = (employeeId?: string) => {
+// enabled: solo el admin puede ver los logs de login
+export const useLoginLogs = (enabled: boolean) => {
   const [loginLogs, setLoginLogs] = useState<LoginLog[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchLoginLogs();
-  }, [employeeId]);
-
-  const fetchLoginLogs = async () => {
+  const fetchLoginLogs = useCallback(async () => {
     try {
       setLoading(true);
-      const data = employeeId 
-        ? await loginLogsService.getByEmployeeId(employeeId)
-        : await loginLogsService.getAll();
+      const data = await loginLogsService.getAll();
       setLoginLogs(data);
       setError(null);
     } catch (err) {
@@ -24,31 +19,20 @@ export const useLoginLogs = (employeeId?: string) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const createLoginLog = async (loginLogData: CreateLoginLogDTO): Promise<void> => {
-    try {
-      const newLog = await loginLogsService.create(loginLogData);
-      setLoginLogs(prev => [newLog, ...prev]);
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Error al crear log de login');
+  useEffect(() => {
+    if (enabled) {
+      fetchLoginLogs();
+    } else {
+      setLoginLogs([]);
     }
-  };
-
-  const getTodayLogs = async (): Promise<LoginLog[]> => {
-    try {
-      return await loginLogsService.getToday();
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Error al obtener logs de hoy');
-    }
-  };
+  }, [enabled, fetchLoginLogs]);
 
   return {
     loginLogs,
     loading,
     error,
-    createLoginLog,
-    getTodayLogs,
-    refetch: fetchLoginLogs
+    refetch: fetchLoginLogs,
   };
 };

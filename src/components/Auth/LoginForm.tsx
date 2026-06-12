@@ -1,27 +1,24 @@
 import React, { useState } from 'react';
-import { User, Mail, Lock, AlertCircle } from 'lucide-react';
+import { User, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react';
 import type { LoginFormProps } from '@/types';
 
-const LoginForm: React.FC<LoginFormProps> = ({ onLogin, employees }) => {
+const LoginForm: React.FC<LoginFormProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = () => {
-    const user = employees.find(u => u.email === email && u.password === password);
-    
-    if (user) {
-      onLogin(user);
-      setError('');
-    } else {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (submitting) return;
+
+    setSubmitting(true);
+    setError('');
+    const success = await onLogin({ email, password });
+    if (!success) {
       setError('Credenciales incorrectas');
     }
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSubmit();
-    }
+    setSubmitting(false);
   };
 
   return (
@@ -41,18 +38,20 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, employees }) => {
         </div>
       )}
 
-      <div className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-2">
             Correo Electrónico
           </label>
           <div className="relative">
             <Mail className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
             <input
+              id="login-email"
               type="email"
+              required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              onKeyUp={handleKeyPress}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               placeholder="tu@empresa.com"
             />
@@ -60,16 +59,18 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, employees }) => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-2">
             Contraseña
           </label>
           <div className="relative">
             <Lock className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
             <input
+              id="login-password"
               type="password"
+              required
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              onKeyPress={handleKeyPress}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               placeholder="••••••••"
             />
@@ -77,18 +78,14 @@ const LoginForm: React.FC<LoginFormProps> = ({ onLogin, employees }) => {
         </div>
 
         <button
-          onClick={handleSubmit}
-          className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-semibold transition"
+          type="submit"
+          disabled={submitting}
+          className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white py-3 rounded-lg font-semibold transition flex items-center justify-center gap-2"
         >
-          Ingresar
+          {submitting && <Loader2 className="w-5 h-5 animate-spin" />}
+          {submitting ? 'Entrando…' : 'Ingresar'}
         </button>
-      </div>
-
-      <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-        <p className="text-xs text-gray-600 mb-2">Credenciales de prueba:</p>
-        <p className="text-xs text-gray-700"><strong>Empleado:</strong> juan@empresa.com / 1234</p>
-        <p className="text-xs text-gray-700"><strong>Admin:</strong> admin@empresa.com / admin</p>
-      </div>
+      </form>
     </div>
   );
 };

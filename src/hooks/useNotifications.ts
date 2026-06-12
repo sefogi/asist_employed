@@ -1,20 +1,17 @@
-import { useState, useEffect } from 'react';
-import { notificationsService } from '@/services/supabase/notifications';
-import type { Notification, CreateNotificationDTO } from '@/types';
+import { useState, useEffect, useCallback } from 'react';
+import { notificationsService } from '@/services/api/notifications';
+import type { Notification } from '@/types';
 
-export const useNotifications = () => {
+// enabled: solo el admin puede ver notificaciones
+export const useNotifications = (enabled: boolean) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
-
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await notificationsService.getUnread();
+      const data = await notificationsService.getAll();
       setNotifications(data);
       setError(null);
     } catch (err) {
@@ -22,42 +19,26 @@ export const useNotifications = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const createNotification = async (notificationData: CreateNotificationDTO): Promise<void> => {
-    try {
-      const newNotification = await notificationsService.create(notificationData);
-      setNotifications(prev => [newNotification, ...prev]);
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Error al crear notificación');
+  useEffect(() => {
+    if (enabled) {
+      fetchNotifications();
+    } else {
+      setNotifications([]);
     }
-  };
-
-  const markAsRead = async (id: string): Promise<void> => {
-    try {
-      await notificationsService.markAsRead(id);
-      setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Error al marcar como leída');
-    }
-  };
+  }, [enabled, fetchNotifications]);
 
   const deleteNotification = async (id: string): Promise<void> => {
-    try {
-      await notificationsService.delete(id);
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Error al eliminar notificación');
-    }
+    await notificationsService.delete(id);
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
   };
 
   return {
     notifications,
     loading,
     error,
-    createNotification,
-    markAsRead,
     deleteNotification,
-    refetch: fetchNotifications
+    refetch: fetchNotifications,
   };
 };

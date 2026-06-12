@@ -3,7 +3,6 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  password?: string;
   role: 'employee' | 'admin';
   department: string;
   position: string;
@@ -18,6 +17,14 @@ export interface CreateUserDTO {
   position: string;
 }
 
+export interface UpdateUserDTO {
+  name?: string;
+  email?: string;
+  password?: string;
+  department?: string;
+  position?: string;
+}
+
 export interface LoginCredentials {
   email: string;
   password: string;
@@ -27,7 +34,7 @@ export interface LoginCredentials {
 export interface AttendanceRecord {
   id: string;
   employee_id: string;
-  employee_name?: string;
+  employee_name: string;
   check_in: string;
   check_out: string | null;
   overtime_requested: boolean;
@@ -35,34 +42,16 @@ export interface AttendanceRecord {
   created_at?: string;
 }
 
-export interface CreateAttendanceDTO {
-  employee_id: string;
-  employee_name: string;
-  check_in: string;
-}
-
-export interface UpdateAttendanceDTO {
-  check_out?: string;
-  overtime_requested?: boolean;
-  overtime_approved?: boolean;
-}
-
 // Notification Types
 export interface Notification {
   id: string;
   employee_id: string;
   employee_name: string;
+  attendance_id: string | null;
   message: string;
   type: 'overtime_request' | 'approval' | 'info';
-  read?: boolean;
+  read: boolean;
   timestamp: string;
-}
-
-export interface CreateNotificationDTO {
-  employee_id: string;
-  employee_name: string;
-  message: string;
-  type: 'overtime_request' | 'approval' | 'info';
 }
 
 // LoginLog Types
@@ -71,11 +60,6 @@ export interface LoginLog {
   employee_id: string;
   employee_name: string;
   login_time: string;
-}
-
-export interface CreateLoginLogDTO {
-  employee_id: string;
-  employee_name: string;
 }
 
 // Alert Types
@@ -100,8 +84,7 @@ export interface AttendanceControlsProps {
 }
 
 export interface LoginFormProps {
-  onLogin: (user: User) => void;
-  employees: User[];
+  onLogin: (credentials: LoginCredentials) => Promise<boolean>;
 }
 
 export interface AlertProps {
@@ -129,7 +112,7 @@ export interface AdminDashboardProps {
   notifications: Notification[];
   loginLogs: LoginLog[];
   employees: User[];
-  onApproveOvertime: (notificationId: string, employeeId: string) => void;
+  onApproveOvertime: (notification: Notification) => void;
   onLogout: () => void;
   onCreateEmployee: (data: CreateUserDTO) => void;
 }
