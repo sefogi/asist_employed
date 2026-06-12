@@ -22,11 +22,10 @@ export const useAttendance = (enabled: boolean) => {
   }, []);
 
   useEffect(() => {
-    if (enabled) {
-      fetchAttendance();
-    } else {
-      setAttendance([]);
-    }
+    if (!enabled) return;
+    // Carga inicial de datos: el setLoading síncrono dentro del fetch es intencional
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchAttendance();
   }, [enabled, fetchAttendance]);
 
   const checkIn = async (): Promise<AttendanceRecord> => {
@@ -52,7 +51,8 @@ export const useAttendance = (enabled: boolean) => {
   };
 
   return {
-    attendance,
+    // Derivado: sin sesión no se exponen datos de un usuario anterior
+    attendance: enabled ? attendance : [],
     loading,
     error,
     checkIn,

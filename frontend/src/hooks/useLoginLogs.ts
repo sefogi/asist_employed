@@ -22,15 +22,14 @@ export const useLoginLogs = (enabled: boolean) => {
   }, []);
 
   useEffect(() => {
-    if (enabled) {
-      fetchLoginLogs();
-    } else {
-      setLoginLogs([]);
-    }
+    if (!enabled) return;
+    // Carga inicial de datos: el setLoading síncrono dentro del fetch es intencional
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchLoginLogs();
   }, [enabled, fetchLoginLogs]);
 
   return {
-    loginLogs,
+    loginLogs: enabled ? loginLogs : [],
     loading,
     error,
     refetch: fetchLoginLogs,
