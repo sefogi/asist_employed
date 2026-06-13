@@ -140,13 +140,13 @@ El backlog funcional detallado está en [docs/historias-usuario.md](docs/histori
 (HU-01 a HU-08, alineadas con la Ley de control horario 2026).
 
 - [x] **Fase 1** — Backend propio (Fastify + PostgreSQL), bcrypt + JWT, contrato OpenAPI, TDD
-- [ ] **Fase 2** — Dockerización completa (frontend + API + BD + nginx) para un solo servidor
-- [ ] **Fase 3** — CI/CD con GitHub Actions (lint + tests + build + deploy)
-- [ ] **Fase 4** — Núcleo legal del registro horario: pausas + auditoría inalterable + export (HU-04), horarios y cargas horarias (HU-05)
-- [ ] **Fase 5** — Incidencias y automatización: registro olvidado (HU-02), cierre automático de turno (HU-03), ausencias injustificadas + módulo de vacaciones/bajas + email (HU-01)
-- [ ] **Fase 6** — Rediseño UX/UI (mobile-first, routing, sistema de diseño) + confirmación de acciones (HU-06)
-- [ ] **Fase 7** — Hardening: HTTPS, backups automáticos (retención 4 años), rate-limiting
-- [ ] **Fase 8** — Avanzadas: geolocalización RGPD (HU-07), modo kiosco PIN/QR (HU-08)
+- [ ] **Fase 2** ([#1](https://github.com/sefogi/asist_employed/issues/1)) — Dockerización completa (frontend + API + BD + nginx) para un solo servidor
+- [ ] **Fase 3** ([#2](https://github.com/sefogi/asist_employed/issues/2)) — CI/CD con GitHub Actions (lint + tests + build + deploy)
+- [ ] **Fase 4** ([#3](https://github.com/sefogi/asist_employed/issues/3)) — Núcleo legal del registro horario: pausas + auditoría inalterable + export (HU-04), horarios y cargas horarias (HU-05)
+- [ ] **Fase 5** ([#4](https://github.com/sefogi/asist_employed/issues/4)) — Incidencias y automatización: registro olvidado (HU-02), cierre automático de turno (HU-03), ausencias injustificadas + módulo de vacaciones/bajas + email (HU-01)
+- [ ] **Fase 6** ([#5](https://github.com/sefogi/asist_employed/issues/5)) — Rediseño UX/UI (mobile-first, routing, sistema de diseño) + confirmación de acciones (HU-06)
+- [ ] **Fase 7** ([#6](https://github.com/sefogi/asist_employed/issues/6)) — Hardening: HTTPS, backups automáticos (retención 4 años), rate-limiting
+- [ ] **Fase 8** ([#7](https://github.com/sefogi/asist_employed/issues/7)) — Avanzadas: geolocalización RGPD (HU-07), modo kiosco PIN/QR (HU-08)
 
 ## Licencia
 
