@@ -1,5 +1,7 @@
 # Sistema de Control de Asistencia de Empleados
 
+[![CI](https://github.com/sefogi/asist_employed/actions/workflows/ci.yml/badge.svg)](https://github.com/sefogi/asist_employed/actions/workflows/ci.yml)
+
 Sistema de gestión de asistencia laboral: los empleados fichan entrada/salida y solicitan horas extra; el administrador gestiona empleados, aprueba horas extra y exporta reportes.
 
 ## Arquitectura
@@ -175,14 +177,26 @@ Ramas:
 
 Commits con [Conventional Commits](https://www.conventionalcommits.org/es/) (`feat:`, `fix:`, `docs:`, `refactor:`, `chore:`…; `!` para breaking changes), que mapean directo a [SemVer](https://semver.org/lang/es/): `fix` → patch, `feat` → minor, breaking → major. Pre-1.0, los breaking changes suben el minor.
 
+## Integración continua (CI/CD)
+
+GitHub Actions en [`.github/workflows/`](.github/workflows):
+
+- **`ci.yml`** — se ejecuta en cada PR y push a `develop`/`main`. Tres jobs en paralelo:
+  - `quality`: `lint` + `typecheck` + `build` de todo el monorepo.
+  - `test`: la suite TDD del backend contra un **Postgres real** (service container).
+  - `docker`: construye las imágenes de API y web para validar los Dockerfiles.
+
+  Usa caché de pnpm y de capas Docker (GHA) para acelerar; cancela ejecuciones obsoletas de la misma rama.
+- **`release.yml`** — al crear un tag `vX.Y.Z`, construye y publica las imágenes de producción en GHCR (`ghcr.io/sefogi/asist_employed-api` y `-web`). El despliegue automático en un servidor se añadirá cuando exista uno.
+
 ## Roadmap
 
 El backlog funcional detallado está en [docs/historias-usuario.md](docs/historias-usuario.md)
 (HU-01 a HU-08, alineadas con la Ley de control horario 2026).
 
 - [x] **Fase 1** — Backend propio (Fastify + PostgreSQL), bcrypt + JWT, contrato OpenAPI, TDD
-- [ ] **Fase 2** ([#1](https://github.com/sefogi/asist_employed/issues/1)) — Dockerización completa (frontend + API + BD + nginx) para un solo servidor
-- [ ] **Fase 3** ([#2](https://github.com/sefogi/asist_employed/issues/2)) — CI/CD con GitHub Actions (lint + tests + build + deploy)
+- [x] **Fase 2** ([#1](https://github.com/sefogi/asist_employed/issues/1)) — Dockerización completa (frontend + API + BD + nginx) para un solo servidor
+- [x] **Fase 3** ([#2](https://github.com/sefogi/asist_employed/issues/2)) — CI/CD con GitHub Actions (lint + tests + build de imágenes); deploy a servidor pendiente de infraestructura
 - [ ] **Fase 4** ([#3](https://github.com/sefogi/asist_employed/issues/3)) — Núcleo legal del registro horario: pausas + auditoría inalterable + export (HU-04), horarios y cargas horarias (HU-05)
 - [ ] **Fase 5** ([#4](https://github.com/sefogi/asist_employed/issues/4)) — Incidencias y automatización: registro olvidado (HU-02), cierre automático de turno (HU-03), ausencias injustificadas + módulo de vacaciones/bajas + email (HU-01)
 - [ ] **Fase 6** ([#5](https://github.com/sefogi/asist_employed/issues/5)) — Rediseño UX/UI (mobile-first, routing, sistema de diseño) + confirmación de acciones (HU-06)
