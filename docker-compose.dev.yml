@@ -1,3 +1,6 @@
+# Proyecto aislado del stack de producción (docker-compose.yml)
+name: asist_employed_dev
+
 services:
   db:
     image: postgres:16-alpine

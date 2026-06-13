@@ -1,0 +1,83 @@
+# Stack de producción: todo en un servidor con `docker compose up -d`.
+# Requiere un .env en la raíz (copia .env.example y ajusta los valores).
+# Para la BD de desarrollo en local usa docker-compose.dev.yml.
+
+# Nombre de proyecto propio para no colisionar con el stack de desarrollo
+name: asist_employed
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?definir en .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?definir en .env}
+      POSTGRES_DB: ${POSTGRES_DB:?definir en .env}
+    volumes:
+      - asist_db_prod:/var/lib/postgresql/data
+    # Sin ports: la BD solo es accesible desde la red interna del compose
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET:?definir en .env}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-10}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Europe/Madrid}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      db:
+        condition: service_healthy
+    # Las migraciones se aplican automáticamente al arrancar (src/server.ts)
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/v1/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      start_period: 15s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  # Datos iniciales (admin + empleados demo). Uso puntual:
+  #   docker compose --profile tools run --rm seed
+  seed:
+    profiles: ["tools"]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      target: build
+    command: pnpm --filter asist-employed-api seed
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@empresa.com}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-cambiar-admin-123}
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  asist_db_prod:

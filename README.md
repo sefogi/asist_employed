@@ -34,7 +34,12 @@ asist_employed/
 │   └── package.json
 ├── docs/
 │   └── openapi.yaml      # contrato del API (fuente de verdad)
-├── docker-compose.dev.yml
+├── backend/Dockerfile    # imagen del API (multi-stage)
+├── frontend/Dockerfile   # build de la SPA + nginx
+├── frontend/nginx.conf   # nginx sirve la SPA y proxyea /api
+├── docker-compose.yml    # stack de producción (db + api + web)
+├── docker-compose.dev.yml# solo la BD para desarrollo
+├── .env.example          # configuración global de producción
 ├── pnpm-workspace.yaml
 └── package.json          # scripts del workspace
 ```
@@ -63,6 +68,42 @@ pnpm dev        # frontend en http://localhost:5173
 ```
 
 Los tests del backend necesitan la BD de Docker levantada: `pnpm test`.
+
+## Despliegue en producción (Docker)
+
+Todo el stack —PostgreSQL, API y frontend con nginx— corre en un solo servidor con `docker compose`. No hace falta Node ni pnpm instalados en la máquina: las imágenes se construyen solas.
+
+```bash
+# 1. Configuración global (en la raíz del repo)
+cp .env.example .env       # edita POSTGRES_PASSWORD y, sobre todo, JWT_SECRET
+
+# 2. Construir y levantar (db → api → web, encadenados por healthcheck)
+docker compose up -d --build
+
+# 3. Cargar el usuario admin inicial (solo la primera vez)
+docker compose --profile tools run --rm seed
+```
+
+La aplicación queda en **http://localhost:8080** (cambia el puerto con `WEB_PORT` en el `.env`). nginx sirve la SPA y proxyea `/api` al backend, así que **todo va por el mismo origen y no hay CORS** en producción.
+
+Detalles del stack:
+
+- **`db`** — PostgreSQL 16 con volumen persistente `asist_db_prod`. No publica puerto al host: solo es accesible desde la red interna del compose.
+- **`api`** — aplica las migraciones automáticamente al arrancar; healthcheck contra `/api/v1/health`. No arranca hasta que la BD está `healthy`.
+- **`web`** — nginx con la SPA compilada; no arranca hasta que el API está `healthy`.
+- **`seed`** — servicio puntual (perfil `tools`), no forma parte del stack permanente. Define `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` en el `.env` para no usar las credenciales por defecto.
+
+Operación habitual:
+
+```bash
+docker compose ps                 # estado y salud de los servicios
+docker compose logs -f api        # logs del backend
+docker compose up -d --build      # redeploy tras cambios de código
+docker compose down               # parar (conserva los datos)
+docker compose down -v            # parar y BORRAR la base de datos
+```
+
+> El compose de producción usa el proyecto `asist_employed` y el de desarrollo `asist_employed_dev`: son independientes y no se pisan, puedes tener ambos sin conflicto.
 
 ## Usuarios de prueba (seed)
 
